@@ -17,7 +17,7 @@ pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, app_data_dir
     let mut cmd = std::process::Command::new(&sidecar_path);
     
     // Add resource_dir to PATH so the .exe can find its .dll files
-    let mut path_var = std::env::var_os("PATH").unwrap_or_default();
+    let path_var = std::env::var_os("PATH").unwrap_or_default();
     let mut paths = std::env::split_paths(&path_var).collect::<Vec<_>>();
     paths.push(resource_dir.to_path_buf());
     let new_path = std::env::join_paths(paths).unwrap();

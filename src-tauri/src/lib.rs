@@ -191,7 +191,7 @@ async fn process_audio(app: AppHandle, data: Vec<f32>, sample_rate: u32) {
     let app_data_dir = app.path().app_data_dir().unwrap();
     let resource_dir = app.path().resource_dir().unwrap().join("resources");
 
-    let wav_path = match audio::save_to_wav(data, sample_rate, app_data_dir) {
+    let wav_path = match audio::save_to_wav(data, sample_rate, app_data_dir.clone()) {
         Ok(path) => path,
         Err(_) => return,
     };
@@ -254,19 +254,23 @@ fn update_config(app: AppHandle, state: tauri::State<'_, AppState>,
     if config.auto_start != auto_start {
         if cfg!(windows) {
             let app_path = std::env::current_exe().unwrap();
-            let app_path_str = app_path.to_str().unwrap();
-            let app_name = "SwiftSpeak";
-            if auto_start {
-                let _ = std::process::Command::new("reg")
-                    .arg("add").arg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run")
-                    .arg("/v").arg(app_name).arg("/t").arg("REG_SZ")
-                    .arg("/d").arg(format!("\"{}\" --minimized", app_path_str))
-                    .arg("/f").output();
-            } else {
-                let _ = std::process::Command::new("reg")
-                    .arg("delete").arg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run")
-                    .arg("/v").arg(app_name).arg("/f").output();
-            }
+            let app_path_str = app_path.to_str().unwrap().to_string();
+            let app_name = "SwiftSpeak".to_string();
+            
+            // Move to background to prevent UI lag
+            std::thread::spawn(move || {
+                if auto_start {
+                    let _ = std::process::Command::new("reg")
+                        .arg("add").arg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run")
+                        .arg("/v").arg(&app_name).arg("/t").arg("REG_SZ")
+                        .arg("/d").arg(format!("\"{}\" --minimized", app_path_str))
+                        .arg("/f").output();
+                } else {
+                    let _ = std::process::Command::new("reg")
+                        .arg("delete").arg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run")
+                        .arg("/v").arg(&app_name).arg("/f").output();
+                }
+            });
         }
     }
 
@@ -381,7 +385,9 @@ pub fn run() {
                 }
             }
         }).build())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_window_state::Builder::default()
+            .with_denylist(&["overlay"]) // Don't save overlay state
+            .build())
         .setup(|app| {
             let config = load_config(app.app_handle());
             {
