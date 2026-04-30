@@ -76,3 +76,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Contributions are welcome! Feel free to open an issue or submit a pull request if you have ideas for new features or optimizations.
 
 *Made with ❤️ by [Ayush](https://github.com/AyushPandey218)*
+
