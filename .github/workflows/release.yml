@@ -18,6 +18,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true # Crucial: Download the 141MB AI model
 
       - name: setup node
         uses: actions/setup-node@v4
