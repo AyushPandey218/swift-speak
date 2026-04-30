@@ -32,9 +32,10 @@ pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, app_data_dir
     use std::os::windows::process::CommandExt;
 
     // Now run from AppData (Guaranteed writable and DLLs are in the same folder)
+    println!("Swift Speak: Starting engine process...");
     let mut cmd = std::process::Command::new(&engine_in_appdata);
     
-    cmd.current_dir(app_data_dir) // Use writable AppData for execution
+    cmd.current_dir(app_data_dir)
         .arg("-m")
         .arg(&model_in_appdata)
         .arg("-f")
@@ -47,24 +48,25 @@ pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, app_data_dir
     #[cfg(windows)]
     cmd.creation_flags(0x08000000);
 
-    let output = cmd.output()
-        .map_err(|e| {
-            println!("Swift Speak: CRITICAL - Failed to start engine process: {}", e);
-            e.to_string()
-        })?;
+    let output = cmd.output().map_err(|e| {
+        let err_msg = format!("CRITICAL - Failed to start engine: {}", e);
+        let _ = std::fs::write(app_data_dir.join("debug.log"), &err_msg);
+        err_msg
+    })?;
+
+    // Log the output for debugging
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let debug_info = format!("STDOUT:\n{}\n\nSTDERR:\n{}\n\nSTATUS: {:?}", stdout, stderr, output.status);
+    let _ = std::fs::write(app_data_dir.join("debug.log"), debug_info);
 
     if output.status.success() {
-        let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        println!("Swift Speak: Engine Success. Transcribed text: '{}'", text);
+        let text = stdout.trim().to_string();
         if text.is_empty() {
-             println!("Swift Speak: Engine returned empty text.");
              return Err("No text detected. Try speaking louder!".to_string());
         }
         Ok(text)
     } else {
-        let err = String::from_utf8_lossy(&output.stderr);
-        println!("Swift Speak: Engine FAILED with status: {:?}", output.status);
-        println!("Swift Speak: Engine Error Output: {}", err);
-        Err(format!("Engine error: {}", err))
+        Err(format!("Engine failed. Check debug.log in AppData."))
     }
 }
