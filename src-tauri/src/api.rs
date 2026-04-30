@@ -1,11 +1,28 @@
 use std::path::Path;
 
 pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, app_data_dir: &Path, language: &str) -> Result<String, String> {
-    let sidecar_path = resource_dir.join("whisper-main.exe");
-    let model_path = resource_dir.join("ggml-base.bin");
-    
-    if !sidecar_path.exists() {
-        return Err(format!("Whisper engine missing in resources: {:?}", sidecar_path));
+    let engine_in_appdata = app_data_dir.join("whisper-main.exe");
+    let model_in_appdata = app_data_dir.join("ggml-base.bin");
+
+    // If files are missing in AppData, copy them from the bundled Resources
+    if !engine_in_appdata.exists() || !model_in_appdata.exists() {
+        println!("Swift Speak: Initializing engine files in AppData...");
+        let _ = std::fs::create_dir_all(app_data_dir);
+        
+        // Copy everything from resources to AppData
+        if let Ok(entries) = std::fs::read_dir(resource_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    let dest = app_data_dir.join(path.file_name().unwrap());
+                    let _ = std::fs::copy(&path, &dest);
+                }
+            }
+        }
+    }
+
+    if !engine_in_appdata.exists() {
+        return Err(format!("Engine initialization failed. Could not find whisper-main.exe"));
     }
 
     // -np (no prints) is critical to only get the transcribed text
@@ -14,18 +31,12 @@ pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, app_data_dir
     #[cfg(windows)]
     use std::os::windows::process::CommandExt;
 
-    let mut cmd = std::process::Command::new(&sidecar_path);
+    // Now run from AppData (Guaranteed writable and DLLs are in the same folder)
+    let mut cmd = std::process::Command::new(&engine_in_appdata);
     
-    // Add resource_dir to PATH so the .exe can find its .dll files
-    let path_var = std::env::var_os("PATH").unwrap_or_default();
-    let mut paths = std::env::split_paths(&path_var).collect::<Vec<_>>();
-    paths.push(resource_dir.to_path_buf());
-    let new_path = std::env::join_paths(paths).unwrap();
-    
-    cmd.env("PATH", new_path)
-        .current_dir(app_data_dir) // Use writable AppData for execution
+    cmd.current_dir(app_data_dir) // Use writable AppData for execution
         .arg("-m")
-        .arg(&model_path)
+        .arg(&model_in_appdata)
         .arg("-f")
         .arg(wav_path.to_str().unwrap())
         .arg("-l")
