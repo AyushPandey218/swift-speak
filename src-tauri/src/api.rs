@@ -1,6 +1,6 @@
 use std::path::Path;
 
-pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, language: &str) -> Result<String, String> {
+pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, app_data_dir: &Path, language: &str) -> Result<String, String> {
     let sidecar_path = resource_dir.join("whisper-main.exe");
     let model_path = resource_dir.join("ggml-base.bin");
     
@@ -15,7 +15,15 @@ pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, language: &s
     use std::os::windows::process::CommandExt;
 
     let mut cmd = std::process::Command::new(&sidecar_path);
-    cmd.current_dir(resource_dir)
+    
+    // Add resource_dir to PATH so the .exe can find its .dll files
+    let mut path_var = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths = std::env::split_paths(&path_var).collect::<Vec<_>>();
+    paths.push(resource_dir.to_path_buf());
+    let new_path = std::env::join_paths(paths).unwrap();
+    
+    cmd.env("PATH", new_path)
+        .current_dir(app_data_dir) // Use writable AppData for execution
         .arg("-m")
         .arg(&model_path)
         .arg("-f")

@@ -202,7 +202,7 @@ async fn process_audio(app: AppHandle, data: Vec<f32>, sample_rate: u32) {
         config.language.clone()
     };
 
-    match api::transcribe_local(&wav_path, &resource_dir, &language).await {
+    match api::transcribe_local(&wav_path, &resource_dir, &app_data_dir, &language).await {
         Ok(text) => {
             if !text.is_empty() {
                 let (auto_type, typing_speed, ai_mode) = {
