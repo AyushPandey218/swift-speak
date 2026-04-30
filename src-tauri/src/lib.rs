@@ -189,19 +189,20 @@ async fn stop_recording(app: AppHandle, state: tauri::State<'_, AppState>) -> Re
 async fn process_audio(app: AppHandle, data: Vec<f32>, sample_rate: u32) {
     app.emit("recording-status", serde_json::json!({ "recording": false, "status": "Transcribing..." })).unwrap();
     let app_data_dir = app.path().app_data_dir().unwrap();
-    
-    let wav_path = match audio::save_to_wav(data, sample_rate, app_data_dir.clone()) {
+    let resource_dir = app.path().resource_dir().unwrap().join("resources");
+
+    let wav_path = match audio::save_to_wav(data, sample_rate, app_data_dir) {
         Ok(path) => path,
         Err(_) => return,
     };
-    
+
     let language = {
         let state = app.state::<AppState>();
         let config = state.config.lock().unwrap();
         config.language.clone()
     };
 
-    match api::transcribe_local(&wav_path, &app_data_dir, &language).await {
+    match api::transcribe_local(&wav_path, &resource_dir, &language).await {
         Ok(text) => {
             if !text.is_empty() {
                 let (auto_type, typing_speed, ai_mode) = {

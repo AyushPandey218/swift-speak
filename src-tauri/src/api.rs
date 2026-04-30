@@ -1,25 +1,11 @@
 use std::path::Path;
 
-pub async fn transcribe_local(wav_path: &Path, app_data_dir: &Path, language: &str) -> Result<String, String> {
-    let mut sidecar_path = app_data_dir.join("whisper-main.exe");
-    let mut model_path = app_data_dir.join("ggml-base.bin");
-    
-    // Smart detection: If not in current folder, check the legacy folder
-    if !sidecar_path.exists() {
-        let legacy_dir = app_data_dir.parent().unwrap().join("com.ayush.tauri-app");
-        if legacy_dir.exists() {
-            let legacy_sidecar = legacy_dir.join("whisper-main.exe");
-            let legacy_model = legacy_dir.join("ggml-base.bin");
-            if legacy_sidecar.exists() && legacy_model.exists() {
-                println!("Swift Speak: Found AI engine in legacy folder. Using that.");
-                sidecar_path = legacy_sidecar;
-                model_path = legacy_model;
-            }
-        }
-    }
+pub async fn transcribe_local(wav_path: &Path, resource_dir: &Path, language: &str) -> Result<String, String> {
+    let sidecar_path = resource_dir.join("whisper-main.exe");
+    let model_path = resource_dir.join("ggml-base.bin");
     
     if !sidecar_path.exists() {
-        return Err("Whisper engine (whisper-main.exe) missing. Please move it to the new AppData folder or use the 'Download' button in settings.".to_string());
+        return Err(format!("Whisper engine missing in resources: {:?}", sidecar_path));
     }
 
     // -np (no prints) is critical to only get the transcribed text
@@ -29,7 +15,7 @@ pub async fn transcribe_local(wav_path: &Path, app_data_dir: &Path, language: &s
     use std::os::windows::process::CommandExt;
 
     let mut cmd = std::process::Command::new(&sidecar_path);
-    cmd.current_dir(app_data_dir)
+    cmd.current_dir(resource_dir)
         .arg("-m")
         .arg(&model_path)
         .arg("-f")
